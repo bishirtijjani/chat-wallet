@@ -353,7 +353,46 @@ Money + chat = high stakes. Baseline requirements:
 
 ---
 
-## 6. Roadmap (build in slices)
+## 6. Revenue model
+
+Margins are thin at launch — PSP fees eat into every transaction and users are
+price-sensitive — so **v1 is about trust and growth, not profit.** We keep money
+_inside_ the app free-flowing and only charge at the edges, in ways that feel
+native to how adashe already works.
+
+### v1 — DECIDED
+
+1. ✅ **Cycle fee (coordinator fee).** The `alajo` already earns a cut in real
+   life, so a fee here feels native, not like a tax. Charge a small fee per
+   circle **cycle** — a flat naira amount or ~1–2% of a single round's pot — paid
+   by the group. **We never touch members' contributions mid-circle.**
+2. ✅ **Cash-out fee.** A small fee (flat ₦, or a %) when money leaves a wallet to
+   a bank account. Users tolerate this because banks and PSPs already charge it.
+   Contributions and payouts _within_ the app stay free, so money keeps
+   circulating instead of leaving.
+
+Accounting-wise this activates the `fees_revenue` ledger account: every fee is a
+normal balanced transaction crediting `fees_revenue`.
+
+### Later (not v1)
+
+- **Float income** — interest on idle wallet/escrow balances. Only works if our
+  licensed PSP partner (Paystack/Monnify) shares float revenue, since **they**
+  hold the funds, not us. A negotiation, not a launch lever.
+- **Premium / subscription** — free for small circles; paid tier for larger
+  groups, more concurrent circles, analytics, verified-admin badge, priority
+  support.
+- **Value-added services** — airtime/bill payments, then the real prize: use each
+  member's in-app savings/repayment history as a credit signal for lending /
+  BNPL and insurance. This is where Nigerian fintechs typically become
+  profitable.
+
+> Guiding rule: charge for **moving money out** and for **running a circle** —
+> never for saving. Saving must feel free.
+
+---
+
+## 7. Roadmap (build in slices)
 
 Each milestone is shippable and testable on its own.
 
@@ -385,7 +424,7 @@ One Expo app shipping to iOS, Android, and web; notifications, KYC flows, harden
 
 ---
 
-## 7. Open questions & decisions to make
+## 8. Open questions & decisions to make
 
 These need answers (some are yours, some are legal/business, some we defer):
 
@@ -396,8 +435,8 @@ These need answers (some are yours, some are legal/business, some we defer):
 3. ✅ **Default policy — DECIDED.** Admin-controlled membership; admin is
    responsible for collection; platform is not liable and offers no guarantee
    fund. We digitize, we don't underwrite.
-4. **Revenue model** — do we take a fee (per circle / per payout / subscription),
-   or is it free at first? Affects whether we need a `fees_revenue` account now.
+4. ✅ **Revenue model — DECIDED.** v1 = cycle fee + cash-out fee (see §6). We do
+   need the `fees_revenue` ledger account from the start.
 5. **Product name** — "Chat & Wallet" is a placeholder.
 6. **Circle size / amount limits** — min/max members, min/max contribution
    (ties to KYC tiers).
@@ -407,7 +446,7 @@ Web) serves iOS, Android, and web from the same source.
 
 ---
 
-## 8. Glossary
+## 9. Glossary
 
 | Term | Meaning |
 |---|---|
