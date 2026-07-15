@@ -150,33 +150,40 @@ alone.
 
 #### Payout order methods (design decision — see Open Questions)
 
-- **Fixed** — order set when circle forms. Simplest. Recommended for v1.
-- **Lottery** — random draw each round. Fairer, needs a verifiable RNG.
+- ✅ **Fixed, set by the admin via a draggable list (DECIDED for v1)** — the
+  admin arranges the payout order by dragging members into position in the app.
+  The order is locked when the cycle starts. Simple, familiar, and mirrors how
+  the `alajo` decides turns today.
+- **Lottery** — random draw each round. Fairer, needs a verifiable RNG. Later.
 - **Auction** — members bid (discount) to receive early; the discount is shared
-  with the rest. Powerful but complex; later.
-- **Needs-based** — coordinator assigns by need. Flexible but trust-heavy.
+  with the rest. Powerful but complex. Later.
+- **Needs-based** — coordinator assigns by need. Flexible but trust-heavy. Later.
 
-**v1 recommendation: `fixed` only.** Ship the others behind the same interface later.
+The draggable order just sets each membership's `position`; the round algorithm
+is unchanged. Lottery/auction later plug into the same `position` interface.
 
-#### The hard problem: default after payout
+#### Default after payout — our stance (DECIDED)
 
 The structural risk in every ROSCA: a member takes their payout in round 3 and
-stops contributing for rounds 4–10. They've received N×C but only paid 3×C.
+stops contributing for rounds 4–10 (received N×C, paid only 3×C).
 
-Mitigations we should design for (not all in v1):
+✅ **We are digitizing an existing offline system, not underwriting it.** Just
+like the local adashe, a member can refuse to pay — and just like the `alajo`,
+the **circle admin adds the members and is responsible for chasing payment.**
+The platform is not liable for a default and does not guarantee funds.
 
-- **Trust/invite-only circles** — members vouch for members (mirrors how real
-  adashe works).
-- **Reputation score** — completion history; visible before you join a circle.
-- **Later-payout for newcomers** — low-trust members get late positions so they
-  pay in more before they collect.
-- **Contribution buffer / guarantee fund** — small over-collection that covers a default.
-- **Wallet holds / auto-debit** — contributions auto-pulled from a funded wallet;
-  a member can be required to pre-fund.
+What that means for the build:
 
-> ⚠️ We will **not** solve default fully in software. The product reduces it
-> with records, reminders, reputation, and auto-debit — the way real adashe
-> reduces it with social pressure.
+- **Admin-controlled membership** — the admin invites/adds people they trust.
+  There is no open "anyone can join" flow. The admin owns the roster.
+- **The app's job is transparency, not enforcement** — accurate records of who
+  paid / who's late, reminders, and a clear paper trail for the admin to act on.
+- **No guarantee fund, no platform liability** in v1. We surface the truth; the
+  admin and the group handle consequences the way they always have.
+
+Optional, later (not v1): reputation/completion history and auto-debit from a
+funded wallet to make paying the path of least resistance — but these are
+convenience, not a promise by us to cover losses.
 
 ### 3.3 Money domain — wallet & ledger
 
@@ -228,12 +235,13 @@ In-app balances are just ledger numbers. Real money enters and leaves through a
 - **Cash out:** user requests payout to bank → we debit `user_wallet`, credit
   `float` → PSP transfer API sends the money.
 
-> ⚠️ **Regulatory reality — read this.** Holding customer funds in Nigeria is a
-> licensed activity (CBN). We will almost certainly **not** hold funds directly
-> at launch. Options: (a) partner with a licensed Microfinance Bank / fintech
-> and use their wallet rails, or (b) use a PSP's managed-wallet / virtual-account
-> product so the licensed partner is the deposit-taker of record. **Do not design
-> as if we are the bank.** See §7.
+> ✅ **DECIDED — we are not the money implementors.** All funds move and are
+> held through a licensed PSP: **Paystack or Monnify**. They are the
+> deposit-taker / settlement layer of record; we integrate with their
+> APIs (virtual accounts, transfers, webhooks) and keep only a mirror ledger for
+> in-app accounting. **We do not hold customer funds ourselves and do not design
+> as if we're the bank.** Monnify is strong for dedicated virtual accounts;
+> Paystack for cards/transfers — we may use one or both.
 
 ### 3.4 Chat domain
 
@@ -384,19 +392,19 @@ React Native app (iOS/Android) + React web, notifications, KYC flows, hardening.
 
 These need answers (some are yours, some are legal/business, some we defer):
 
-1. **Licensing model** — Which licensed partner holds the funds? (MFB partner /
-   PSP managed wallet / switching license.) _Biggest external dependency; shapes
-   the whole money layer._
-2. **PSP** — Paystack, Flutterwave, or both? Sandbox first regardless.
-3. **Revenue model** — do we take a fee (per circle / per payout / subscription),
+1. ✅ **Licensing / money layer — DECIDED.** Ride on a licensed PSP (Paystack or
+   Monnify). We are not the fund holders/implementors.
+2. ✅ **Payout order — DECIDED.** Admin-set `fixed` order via a draggable list in
+   v1.
+3. ✅ **Default policy — DECIDED.** Admin-controlled membership; admin is
+   responsible for collection; platform is not liable and offers no guarantee
+   fund. We digitize, we don't underwrite.
+4. **Revenue model** — do we take a fee (per circle / per payout / subscription),
    or is it free at first? Affects whether we need a `fees_revenue` account now.
-4. **Payout order for v1** — confirm `fixed` only to start.
-5. **Default policy** — pre-fund required? Buffer fund? Reputation gating? How
-   strict at launch?
-6. **Product name** — "Chat & Wallet" is a placeholder.
-7. **Circle size / amount limits** — min/max members, min/max contribution
+5. **Product name** — "Chat & Wallet" is a placeholder.
+6. **Circle size / amount limits** — min/max members, min/max contribution
    (ties to KYC tiers).
-8. **Web scope** — full parity with mobile, or a lighter companion?
+7. **Web scope** — full parity with mobile, or a lighter companion?
 
 ---
 
