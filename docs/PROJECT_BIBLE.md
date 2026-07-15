@@ -261,13 +261,12 @@ In-app balances are just ledger numbers. Real money enters and leaves through a
 ### 4.1 High level
 
 ```
-┌─────────────────────────────┐        ┌──────────────────────────┐
-│  React Native (Expo)        │        │  React web (shared code) │
-│  iOS · Android              │        │  browser                 │
-└───────────────┬─────────────┘        └────────────┬─────────────┘
-                │  REST (HTTPS) + WebSocket          │
-                └──────────────────┬─────────────────┘
-                                   │
+┌─────────────────────────────────────────────────────────────┐
+│  ONE Expo codebase (React Native + React Native Web)          │
+│  iOS   ·   Android   ·   web (browser)                        │
+└───────────────────────────────┬─────────────────────────────┘
+                                 │  REST (HTTPS) + WebSocket
+                                 │
                         ┌──────────▼──────────┐
                         │  Express API (TS)   │
                         │  REST + Socket.IO   │
@@ -296,8 +295,7 @@ In-app balances are just ledger numbers. Real money enters and leaves through a
 | Database | **PostgreSQL** (source of truth, ledger, everything) |
 | Cache / queue / pub-sub | **Redis** (+ BullMQ for jobs) |
 | Real-time | **Socket.IO** |
-| Mobile | **React Native (Expo)** — iOS + Android |
-| Web | **React** (web access, shares logic/types with mobile) |
+| Clients | **One Expo codebase** (React Native + React Native Web) → iOS, Android, **and** web |
 | Payments | **PSP** — Paystack and/or Flutterwave (Nigeria) |
 | Auth | Phone-number + OTP (SMS); JWT sessions |
 
@@ -313,11 +311,10 @@ chat-and-wallet/
 ├─ apps/
 │  ├─ api/               ← Express + Socket.IO server
 │  ├─ worker/            ← BullMQ jobs (scheduler, collection, payouts)
-│  ├─ mobile/            ← React Native (Expo)
-│  └─ web/               ← React web
+│  └─ app/               ← ONE Expo app → iOS, Android, and web (RN Web)
 ├─ packages/
 │  ├─ shared/            ← domain types, zod schemas, constants (money in kobo)
-│  └─ sdk/               ← typed API client used by mobile + web
+│  └─ sdk/               ← typed API client used by the app on every platform
 └─ package.json          ← workspaces (npm / pnpm)
 ```
 
@@ -380,8 +377,8 @@ post into the circle chat. _Outcome: a full adashe cycle runs end to end._
 **M4 — Trust & robustness**
 Reputation, late/missed handling, reminders, coordinator dashboard, dispute log.
 
-**M5 — Clients & polish**
-React Native app (iOS/Android) + React web, notifications, KYC flows, hardening.
+**M5 — Client & polish**
+One Expo app shipping to iOS, Android, and web; notifications, KYC flows, hardening.
 
 > **Dependency order that matters:** Wallet (M1) underpins ROSCA (M3). Chat (M2)
 > is where ROSCA surfaces to users. So M1 → M2 → M3 is the natural spine.
@@ -404,7 +401,9 @@ These need answers (some are yours, some are legal/business, some we defer):
 5. **Product name** — "Chat & Wallet" is a placeholder.
 6. **Circle size / amount limits** — min/max members, min/max contribution
    (ties to KYC tiers).
-7. **Web scope** — full parity with mobile, or a lighter companion?
+
+✅ **Web scope — DECIDED.** No separate web app. One Expo codebase (React Native
+Web) serves iOS, Android, and web from the same source.
 
 ---
 
