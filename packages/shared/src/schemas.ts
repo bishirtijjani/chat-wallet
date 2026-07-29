@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { LIMITS } from './constants.js';
+import { normalizeNigerianPhone } from './phone.js';
 
 /**
  * Request/response validation schemas shared by the API and the client SDK.
@@ -8,13 +9,25 @@ import { LIMITS } from './constants.js';
  */
 
 /**
- * Nigerian phone number in E.164. We accept common local formats on input and
- * normalize elsewhere; this schema validates the normalized result.
+ * Nigerian phone number. Accepts the common formats users actually type
+ * (08012345678, 8012345678, 2348012345678, +2348012345678) and normalizes the
+ * parsed value to E.164 (+234XXXXXXXXXX), so every downstream consumer sees one
+ * canonical form.
  */
 export const phoneSchema = z
   .string()
   .trim()
-  .regex(/^\+234\d{10}$/, 'Phone must be a Nigerian number in E.164 form, e.g. +2348012345678');
+  .transform((value, ctx) => {
+    const normalized = normalizeNigerianPhone(value);
+    if (!normalized) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Enter a valid Nigerian phone number',
+      });
+      return z.NEVER;
+    }
+    return normalized;
+  });
 
 /** A positive whole number of kobo. */
 export const koboAmountSchema = z
@@ -60,6 +73,45 @@ export const cashOutSchema = z.object({
   bankCode: z.string().trim().regex(/^\d{3,6}$/, 'Invalid bank code'),
   idempotencyKey: z.string().uuid().optional(),
 });
+
+// ── Chat ─────────────────────────────────────────────────────────────────────
+
+export const createDirectConversationSchema = z.object({
+  type: z.literal('direct'),
+  participantPhone: phoneSchema,
+});
+
+export const createGroupConversationSchema = z.object({
+  type: z.literal('group'),
+  title: z.string().trim().min(1).max(80),
+  memberPhones: z.array(phoneSchema).max(256).optional(),
+});
+
+export const createConversationSchema = z.discriminatedUnion('type', [
+  createDirectConversationSchema,
+  createGroupConversationSchema,
+]);
+
+export const sendMessageSchema = z.object({
+  body: z.string().trim().min(1).max(4000),
+  type: z.enum(['text', 'image']).default('text'),
+  metadata: z.record(z.unknown()).optional(),
+  idempotencyKey: z.string().uuid().optional(),
+});
+
+export const listMessagesQuerySchema = z.object({
+  before: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+
+export const markReadSchema = z.object({
+  seq: z.number().int().nonnegative(),
+});
+
+export type CreateConversationInput = z.infer<typeof createConversationSchema>;
+export type SendMessageInput = z.infer<typeof sendMessageSchema>;
+export type ListMessagesQuery = z.infer<typeof listMessagesQuerySchema>;
+export type MarkReadInput = z.infer<typeof markReadSchema>;
 
 export type RequestOtpInput = z.infer<typeof requestOtpSchema>;
 export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;

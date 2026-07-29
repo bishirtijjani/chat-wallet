@@ -77,3 +77,54 @@ export interface AuthTokens {
   refreshToken: string;
   expiresIn: number; // seconds until the access token expires
 }
+
+// ── Chat (PROJECT_BIBLE §3.4) ────────────────────────────────────────────────
+
+export type ConversationType = 'direct' | 'group';
+
+/** Member role within a conversation. Circle coordinators are group admins. */
+export type ConversationRole = 'admin' | 'member';
+
+export type MessageType = 'text' | 'system' | 'image';
+
+export interface Conversation {
+  id: string;
+  type: ConversationType;
+  title: string | null; // set for groups
+  /** Set when a ROSCA circle owns this group conversation (M3). */
+  circleId: string | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export interface ConversationMember {
+  conversationId: string;
+  userId: string;
+  role: ConversationRole;
+  lastReadSeq: number;
+  joinedAt: string;
+}
+
+export interface Message {
+  id: string;
+  conversationId: string;
+  /** Monotonic per-message cursor used for ordering and read tracking. */
+  seq: number;
+  senderId: string | null; // null for system messages
+  type: MessageType;
+  body: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
+/** A conversation plus the viewer-specific extras shown in a chat list. */
+export interface ConversationSummary extends Conversation {
+  lastMessage: Message | null;
+  unreadCount: number;
+}
+
+/** Real-time socket event names shared by server and clients. */
+export const SOCKET_EVENTS = {
+  messageNew: 'message:new',
+  conversationUpdated: 'conversation:updated',
+} as const;

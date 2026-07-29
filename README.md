@@ -8,11 +8,15 @@ and roadmap, and [`docs/DESIGN.md`](docs/DESIGN.md) for the design system.
 
 ## Status
 
-Milestones **M0 (Foundation)** and **M1 (Wallet & ledger core)** are scaffolded.
+Milestones **M0 (Foundation)**, **M1 (Wallet & ledger core)**, and
+**M2 (Chat core)** are scaffolded.
 
 - **M0** — monorepo, PostgreSQL + migrations, phone + OTP auth, health checks, CI.
 - **M1** — double-entry append-only ledger, user wallets, fund (PSP sandbox),
   in-app transfer, and cash-out with the v1 fee.
+- **M2** — 1:1 and group conversations, real-time messaging over Socket.IO,
+  paginated history, unread tracking, and a system-message hook for money
+  events (used by the ROSCA engine in M3).
 
 ## Repository shape
 
@@ -22,7 +26,7 @@ chat-and-wallet/
 ├─ packages/
 │  └─ shared/            money (kobo) helpers, domain types, zod schemas, fees
 └─ apps/
-   └─ api/               Express + PostgreSQL: auth + wallet/ledger
+   └─ api/               Express + PostgreSQL + Socket.IO: auth, wallet/ledger, chat
 ```
 
 `apps/worker`, `apps/app` (Expo), and `packages/sdk` arrive in later milestones
@@ -59,7 +63,7 @@ Balances are **derived** from an append-only, double-entry ledger; nothing
 mutates a balance column. Every movement is one balanced transaction (debits ==
 credits), enforced by a database trigger. See `docs/PROJECT_BIBLE.md` §3.3.
 
-## API (M0 + M1)
+## API (M0 + M1 + M2)
 
 | Method | Route | Auth | Purpose |
 |---|---|---|---|
@@ -75,9 +79,33 @@ credits), enforced by a database trigger. See `docs/PROJECT_BIBLE.md` §3.3.
 | `POST` | `/wallet/fund` | Bearer | Fund wallet via PSP (sandbox) |
 | `POST` | `/wallet/transfer` | Bearer | Send money to another user in-app |
 | `POST` | `/wallet/cashout` | Bearer | Withdraw to a bank account (amount + fee) |
+| `GET`  | `/conversations` | Bearer | List conversations (last message + unread) |
+| `POST` | `/conversations` | Bearer | Open a direct chat or create a group |
+| `GET`  | `/conversations/:id/messages` | Bearer | Paginated history (`?before=<seq>&limit=`) |
+| `POST` | `/conversations/:id/messages` | Bearer | Send a message |
+| `POST` | `/conversations/:id/read` | Bearer | Mark read up to a message `seq` |
+
+Phone numbers are accepted in any common Nigerian format (`08012345678`,
+`+2348012345678`, …) and normalized to E.164.
 
 In development, OTP codes are printed to the API logs (`SMS_PROVIDER=console`)
 and the PSP is simulated (`PSP_PROVIDER=sandbox`).
+
+### Real-time (Socket.IO)
+
+The API also serves a Socket.IO endpoint on the same port. Clients authenticate
+in the handshake and are auto-joined to a room per conversation they belong to:
+
+```js
+import { io } from 'socket.io-client';
+const socket = io('http://localhost:4000', { auth: { token: accessToken } });
+socket.on('message:new', (message) => { /* render it */ });
+socket.on('conversation:updated', ({ conversationId }) => { /* refresh list */ });
+```
+
+Sending still goes through `POST /conversations/:id/messages`; the server
+persists the message and pushes `message:new` to the room in real time. System
+messages (e.g. "Amina contributed ₦5,000") arrive on the same channel.
 
 ### Try it
 
