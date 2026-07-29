@@ -1,0 +1,111 @@
+# Chat & Wallet
+
+A social savings platform for Nigeria: a custom chat app, a ROSCA
+(adashe / esusu / ajo) engine, and an in-app wallet — in one product.
+
+See [`docs/PROJECT_BIBLE.md`](docs/PROJECT_BIBLE.md) for the vision, domain model,
+and roadmap, and [`docs/DESIGN.md`](docs/DESIGN.md) for the design system.
+
+## Status
+
+Milestones **M0 (Foundation)** and **M1 (Wallet & ledger core)** are scaffolded.
+
+- **M0** — monorepo, PostgreSQL + migrations, phone + OTP auth, health checks, CI.
+- **M1** — double-entry append-only ledger, user wallets, fund (PSP sandbox),
+  in-app transfer, and cash-out with the v1 fee.
+
+## Repository shape
+
+```
+chat-and-wallet/
+├─ docs/                 project bible + design system
+├─ packages/
+│  └─ shared/            money (kobo) helpers, domain types, zod schemas, fees
+└─ apps/
+   └─ api/               Express + PostgreSQL: auth + wallet/ledger
+```
+
+`apps/worker`, `apps/app` (Expo), and `packages/sdk` arrive in later milestones
+(see the bible's roadmap).
+
+## Getting started
+
+Requires Node 20+ and Docker (for local PostgreSQL).
+
+```bash
+# 1. Install workspaces
+npm install
+
+# 2. Start PostgreSQL
+docker compose up -d
+
+# 3. Configure the API
+cp apps/api/.env.example apps/api/.env    # tweak if needed
+
+# 4. Build shared + api, then run migrations
+npm run build
+npm run migrate
+
+# 5. Run the API
+npm run dev:api
+```
+
+The API listens on `http://localhost:4000`.
+
+## Money model (important)
+
+Money is **integer kobo** everywhere (1 naira = 100 kobo) — never floats.
+Balances are **derived** from an append-only, double-entry ledger; nothing
+mutates a balance column. Every movement is one balanced transaction (debits ==
+credits), enforced by a database trigger. See `docs/PROJECT_BIBLE.md` §3.3.
+
+## API (M0 + M1)
+
+| Method | Route | Auth | Purpose |
+|---|---|---|---|
+| `GET`  | `/health` | — | Liveness |
+| `GET`  | `/health/ready` | — | Readiness (checks DB) |
+| `POST` | `/auth/otp/request` | — | Send a one-time code to a phone |
+| `POST` | `/auth/otp/verify` | — | Verify code → tokens (creates user if new) |
+| `POST` | `/auth/refresh` | — | Rotate refresh token |
+| `POST` | `/auth/logout` | — | Revoke a refresh token |
+| `GET`  | `/auth/me` | Bearer | Current user |
+| `GET`  | `/wallet` | Bearer | Wallet balance |
+| `GET`  | `/wallet/history` | Bearer | Recent ledger movements |
+| `POST` | `/wallet/fund` | Bearer | Fund wallet via PSP (sandbox) |
+| `POST` | `/wallet/transfer` | Bearer | Send money to another user in-app |
+| `POST` | `/wallet/cashout` | Bearer | Withdraw to a bank account (amount + fee) |
+
+In development, OTP codes are printed to the API logs (`SMS_PROVIDER=console`)
+and the PSP is simulated (`PSP_PROVIDER=sandbox`).
+
+### Try it
+
+```bash
+# Request a code (printed to the API logs in dev)
+curl -sX POST localhost:4000/auth/otp/request \
+  -H 'content-type: application/json' -d '{"phone":"08012345678"}'
+
+# Verify it → returns { user, tokens }
+curl -sX POST localhost:4000/auth/otp/verify \
+  -H 'content-type: application/json' \
+  -d '{"phone":"08012345678","code":"123456","displayName":"Amina"}'
+
+# Fund the wallet (₦5,000 = 500000 kobo)
+curl -sX POST localhost:4000/wallet/fund \
+  -H "authorization: Bearer $ACCESS_TOKEN" \
+  -H 'content-type: application/json' -d '{"amount":500000}'
+```
+
+## Scripts
+
+| Command | What |
+|---|---|
+| `npm run build` | Build all workspaces |
+| `npm run typecheck` | Type-check all workspaces |
+| `npm test` | Run unit + integration tests |
+| `npm run migrate` | Apply pending SQL migrations |
+| `npm run dev:api` | Run the API in watch mode |
+
+Tests that need a database are skipped automatically when `DATABASE_URL` is
+unset, so `npm test` runs the pure unit tests anywhere.

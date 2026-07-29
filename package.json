@@ -1,0 +1,21 @@
+{
+  "name": "chat-and-wallet",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Social savings platform for Nigeria: custom chat, ROSCA (adashe/esusu/ajo) engine, and an in-app wallet.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "dev:api": "npm run dev --workspace apps/api",
+    "migrate": "npm run migrate --workspace apps/api"
+  }
+}
