@@ -5,7 +5,7 @@
     "scheme": "chatwallet",
     "version": "0.1.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
       "backgroundColor": "#E8EDF3"
