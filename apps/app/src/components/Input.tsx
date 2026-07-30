@@ -1,4 +1,4 @@
-import { TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
+import { TextInput, View, type TextInputProps, type TextStyle, type ViewStyle } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { AppText } from './AppText';
 
@@ -16,6 +16,10 @@ export function Input({
     paddingVertical: 14,
   };
   (box as Record<string, unknown>).boxShadow = theme.elevation.inset;
+  const field: TextStyle = { color: theme.colors.textPrimary, fontSize: 17, padding: 0 };
+  // react-native-web only: suppress the browser's default focus ring, which
+  // clashes with the neumorphic inset box (DESIGN.md §8) drawn above.
+  (field as Record<string, unknown>).outlineStyle = 'none';
   return (
     <View style={{ gap: theme.space.sm }}>
       {label ? (
@@ -26,7 +30,7 @@ export function Input({
       <View style={box}>
         <TextInput
           placeholderTextColor={theme.colors.textTertiary}
-          style={[{ color: theme.colors.textPrimary, fontSize: 17, padding: 0 }, style]}
+          style={[field, style]}
           {...props}
         />
       </View>
