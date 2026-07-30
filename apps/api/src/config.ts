@@ -20,6 +20,12 @@ const envSchema = z.object({
   OTP_PEPPER: z.string().min(8),
   SMS_PROVIDER: z.enum(['console']).default('console'),
   PSP_PROVIDER: z.enum(['sandbox']).default('sandbox'),
+
+  // Sandbox/dev-only: when both are set, requestOtp() issues this fixed code
+  // instead of a random one for this single phone, so testers have a stable
+  // login without reading container logs. Unset in any real deployment.
+  OTP_TEST_BYPASS_PHONE: z.string().optional(),
+  OTP_TEST_BYPASS_CODE: z.string().length(6).optional(),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

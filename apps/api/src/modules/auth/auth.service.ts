@@ -1,5 +1,6 @@
 import type { AuthTokens, User } from '@caw/shared';
 import { OTP } from '@caw/shared';
+import { loadConfig } from '../../config.js';
 import { pool, withTransaction } from '../../db/pool.js';
 import { AppError } from '../../http/errors.js';
 import { getOrCreateUserWallet } from '../wallet/ledger.service.js';
@@ -23,7 +24,13 @@ export async function requestOtp(phone: string): Promise<{ resendInSeconds: numb
     throw AppError.tooManyRequests('An OTP was just sent. Please wait before requesting another.');
   }
 
-  const code = generateOtp(OTP.length);
+  const config = loadConfig();
+  const code =
+    config.OTP_TEST_BYPASS_PHONE &&
+    config.OTP_TEST_BYPASS_CODE &&
+    phone === config.OTP_TEST_BYPASS_PHONE
+      ? config.OTP_TEST_BYPASS_CODE
+      : generateOtp(OTP.length);
   const expiresAt = new Date(Date.now() + OTP.ttlSeconds * 1000);
   await pool.query(
     `INSERT INTO otp_codes (phone, code_hash, expires_at) VALUES ($1, $2, $3)`,
