@@ -9,6 +9,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "export:web": "expo export --platform web",
+    "build:web-standalone": "cd ../.. && npm install --legacy-peer-deps --no-package-lock && npm run build --workspace packages/shared && npm run export:web --workspace apps/app",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
