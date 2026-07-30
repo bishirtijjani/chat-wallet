@@ -8,15 +8,19 @@ and roadmap, and [`docs/DESIGN.md`](docs/DESIGN.md) for the design system.
 
 ## Status
 
-Milestones **M0 (Foundation)**, **M1 (Wallet & ledger core)**, and
-**M2 (Chat core)** are scaffolded.
+Milestones **M0 (Foundation)**, **M1 (Wallet & ledger core)**,
+**M2 (Chat core)**, and **M3 (ROSCA engine)** are scaffolded.
 
 - **M0** — monorepo, PostgreSQL + migrations, phone + OTP auth, health checks, CI.
 - **M1** — double-entry append-only ledger, user wallets, fund (PSP sandbox),
   in-app transfer, and cash-out with the v1 fee.
 - **M2** — 1:1 and group conversations, real-time messaging over Socket.IO,
-  paginated history, unread tracking, and a system-message hook for money
-  events (used by the ROSCA engine in M3).
+  paginated history, unread tracking, and a system-message hook for money events.
+- **M3** — savings circles (adashe): create a circle (which owns a group chat and
+  an escrow account), add members, set the draggable payout order, start (charging
+  the cycle fee), then run each round — auto-collect contributions into escrow and
+  pay the pot to the round's recipient. Every money event posts into the circle
+  chat as a system message.
 
 ## Repository shape
 
@@ -26,7 +30,11 @@ chat-and-wallet/
 ├─ packages/
 │  └─ shared/            money (kobo) helpers, domain types, zod schemas, fees
 └─ apps/
-   └─ api/               Express + PostgreSQL + Socket.IO: auth, wallet/ledger, chat
+   └─ api/               Express + PostgreSQL + Socket.IO
+      ├─ auth            phone + OTP, JWT + refresh rotation
+      ├─ wallet          double-entry ledger, fund/transfer/cash-out
+      ├─ chat            conversations, messages, real-time, system messages
+      └─ rosca           savings circles: members, payout order, round engine
 ```
 
 `apps/worker`, `apps/app` (Expo), and `packages/sdk` arrive in later milestones
@@ -63,7 +71,7 @@ Balances are **derived** from an append-only, double-entry ledger; nothing
 mutates a balance column. Every movement is one balanced transaction (debits ==
 credits), enforced by a database trigger. See `docs/PROJECT_BIBLE.md` §3.3.
 
-## API (M0 + M1 + M2)
+## API (M0 + M1 + M2 + M3)
 
 | Method | Route | Auth | Purpose |
 |---|---|---|---|
@@ -84,6 +92,17 @@ credits), enforced by a database trigger. See `docs/PROJECT_BIBLE.md` §3.3.
 | `GET`  | `/conversations/:id/messages` | Bearer | Paginated history (`?before=<seq>&limit=`) |
 | `POST` | `/conversations/:id/messages` | Bearer | Send a message |
 | `POST` | `/conversations/:id/read` | Bearer | Mark read up to a message `seq` |
+| `GET`  | `/circles` | Bearer | List circles the caller belongs to |
+| `POST` | `/circles` | Bearer | Create a circle (caller = coordinator) |
+| `GET`  | `/circles/:id` | Bearer | Circle detail (members, rounds, contributions) |
+| `POST` | `/circles/:id/members` | Coordinator | Add a member by phone |
+| `PUT`  | `/circles/:id/order` | Coordinator | Set the draggable payout order |
+| `POST` | `/circles/:id/start` | Coordinator | Start the cycle (charges cycle fee, opens round 1) |
+| `POST` | `/circles/:id/collect` | Coordinator | Auto-collect due contributions for the open round |
+| `POST` | `/circles/:id/settle` | Coordinator | Pay out the pot and open the next round |
+
+`collect`/`settle` are driven manually in M3; the scheduled worker (roadmap
+M-later) will call them on the circle's `frequency`.
 
 Phone numbers are accepted in any common Nigerian format (`08012345678`,
 `+2348012345678`, …) and normalized to E.164.

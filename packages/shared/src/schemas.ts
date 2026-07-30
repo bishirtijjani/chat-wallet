@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LIMITS } from './constants.js';
+import { CIRCLE_LIMITS, LIMITS } from './constants.js';
 import { normalizeNigerianPhone } from './phone.js';
 
 /**
@@ -112,6 +112,35 @@ export type CreateConversationInput = z.infer<typeof createConversationSchema>;
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 export type ListMessagesQuery = z.infer<typeof listMessagesQuerySchema>;
 export type MarkReadInput = z.infer<typeof markReadSchema>;
+
+// ── ROSCA / Savings circles ──────────────────────────────────────────────────
+
+export const createCircleSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  contributionAmount: koboAmountSchema.refine(
+    (v) => v >= CIRCLE_LIMITS.minContributionKobo,
+    { message: `Minimum contribution is ${CIRCLE_LIMITS.minContributionKobo} kobo` },
+  ),
+  frequency: z.enum(['daily', 'weekly', 'monthly']),
+  memberCap: z
+    .number()
+    .int()
+    .min(CIRCLE_LIMITS.minMembers)
+    .max(CIRCLE_LIMITS.maxMembers),
+});
+
+export const addCircleMemberSchema = z.object({
+  phone: phoneSchema,
+});
+
+/** The draggable payout order: membership ids in the exact order to pay them. */
+export const setPayoutOrderSchema = z.object({
+  order: z.array(z.string().uuid()).min(2),
+});
+
+export type CreateCircleInput = z.infer<typeof createCircleSchema>;
+export type AddCircleMemberInput = z.infer<typeof addCircleMemberSchema>;
+export type SetPayoutOrderInput = z.infer<typeof setPayoutOrderSchema>;
 
 export type RequestOtpInput = z.infer<typeof requestOtpSchema>;
 export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;

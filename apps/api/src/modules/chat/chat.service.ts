@@ -63,23 +63,54 @@ export async function createGroupConversation(params: {
 }): Promise<Conversation> {
   const uniqueMembers = [...new Set(params.memberUserIds.filter((id) => id !== params.userId))];
 
-  return withTransaction(async (client) => {
-    const created = await client.query(
-      `INSERT INTO conversations (type, title, created_by)
-       VALUES ('group', $1, $2)
-       RETURNING ${CONVERSATION_COLS}`,
-      [params.title, params.userId],
-    );
-    const conversation = mapConversation(created.rows[0]);
+  const conversation = await withTransaction((client) =>
+    createGroupConversationTx(client, {
+      title: params.title,
+      createdBy: params.userId,
+      members: [
+        { userId: params.userId, role: 'admin' },
+        ...uniqueMembers.map((userId) => ({ userId, role: 'member' as ConversationRole })),
+      ],
+    }),
+  );
 
-    await addMembers(client, conversation.id, [
-      { userId: params.userId, role: 'admin' },
-      ...uniqueMembers.map((userId) => ({ userId, role: 'member' as ConversationRole })),
-    ]);
+  await joinRooms(conversation.id, [params.userId, ...uniqueMembers]);
+  return conversation;
+}
 
-    await joinRooms(conversation.id, [params.userId, ...uniqueMembers]);
-    return conversation;
-  });
+/**
+ * Insert a group conversation and its members within a caller-provided
+ * transaction. Used by the ROSCA engine so a circle and its chat are created
+ * atomically. Room joining is the caller's job after the transaction commits.
+ */
+export async function createGroupConversationTx(
+  client: PoolClient,
+  params: {
+    title: string;
+    createdBy: string;
+    circleId?: string;
+    members: { userId: string; role: ConversationRole }[];
+  },
+): Promise<Conversation> {
+  const created = await client.query(
+    `INSERT INTO conversations (type, title, circle_id, created_by)
+     VALUES ('group', $1, $2, $3)
+     RETURNING ${CONVERSATION_COLS}`,
+    [params.title, params.circleId ?? null, params.createdBy],
+  );
+  const conversation = mapConversation(created.rows[0]);
+  await addMembers(client, conversation.id, params.members);
+  return conversation;
+}
+
+/** Add a member to a conversation within a transaction, and join their live sockets. */
+export async function addConversationMember(
+  client: PoolClient,
+  conversationId: string,
+  userId: string,
+  role: ConversationRole = 'member',
+): Promise<void> {
+  await addMembers(client, conversationId, [{ userId, role }]);
 }
 
 /** List the caller's conversations with last message + unread count, newest first. */

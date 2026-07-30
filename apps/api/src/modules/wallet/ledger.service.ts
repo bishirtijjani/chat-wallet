@@ -79,6 +79,17 @@ export async function getOrCreateUserWallet(
   return mapAccount(reread.rows[0]);
 }
 
+/** Create a fresh circle_escrow account (one per circle). Returns the new account. */
+export async function createCircleEscrowAccount(client: PoolClient): Promise<AccountRow> {
+  const { rows } = await client.query(
+    `INSERT INTO accounts (type, normal_balance)
+     VALUES ('circle_escrow', $1)
+     RETURNING id, type, normal_balance, code, owner_user_id, currency`,
+    [ACCOUNT_NORMAL_BALANCE.circle_escrow],
+  );
+  return mapAccount(rows[0]);
+}
+
 /** Lock an account row for the remainder of the transaction (serializes movements). */
 export async function lockAccount(client: PoolClient, accountId: string): Promise<void> {
   await client.query('SELECT id FROM accounts WHERE id = $1 FOR UPDATE', [accountId]);

@@ -38,12 +38,15 @@ export interface LedgerEntry {
   createdAt: string;
 }
 
-/** The kinds of money movement the ledger records in M1. */
+/** The kinds of money movement the ledger records. */
 export type TransactionKind =
   | 'wallet_funding' // PSP → user wallet
   | 'wallet_transfer' // user wallet → user wallet (in-app p2p)
   | 'wallet_cashout' // user wallet → PSP (bank)
   | 'cashout_fee' // user wallet → fees_revenue
+  | 'contribution' // user wallet → circle escrow (a member pays into a round)
+  | 'payout' // circle escrow → user wallet (the round's pot is disbursed)
+  | 'cycle_fee' // coordinator wallet → fees_revenue (per-cycle coordinator fee)
   | 'reversal'; // corrects a prior transaction
 
 export interface LedgerTransaction {
@@ -128,3 +131,74 @@ export const SOCKET_EVENTS = {
   messageNew: 'message:new',
   conversationUpdated: 'conversation:updated',
 } as const;
+
+// ── ROSCA / Savings circles (PROJECT_BIBLE §3.2) ─────────────────────────────
+
+export type Frequency = 'daily' | 'weekly' | 'monthly';
+
+/** Only 'fixed' (admin-set draggable order) ships in v1; the rest come later. */
+export type PayoutOrderMethod = 'fixed' | 'lottery' | 'auction' | 'needs_based';
+
+export type CircleStatus = 'forming' | 'active' | 'completed' | 'cancelled';
+
+export type MembershipStatus = 'invited' | 'active' | 'defaulted' | 'left';
+
+export type RoundStatus = 'pending' | 'collecting' | 'paid' | 'closed';
+
+export type ContributionStatus = 'due' | 'paid' | 'missed';
+
+export interface Circle {
+  id: string;
+  name: string;
+  contributionAmount: number; // kobo, per member per round
+  frequency: Frequency;
+  payoutOrderMethod: PayoutOrderMethod;
+  memberCap: number; // slots = rounds in a full cycle
+  status: CircleStatus;
+  startDate: string | null;
+  coordinatorId: string;
+  escrowAccountId: string;
+  conversationId: string;
+  currentRound: number; // 0 while forming
+  createdAt: string;
+}
+
+export interface CircleMember {
+  id: string;
+  circleId: string;
+  userId: string;
+  position: number | null; // payout turn (1..N); null until the order is set
+  status: MembershipStatus;
+  joinedAt: string;
+}
+
+export interface Round {
+  id: string;
+  circleId: string;
+  roundNumber: number;
+  recipientMembershipId: string | null;
+  potAmount: number; // kobo
+  status: RoundStatus;
+  openedAt: string | null;
+  paidAt: string | null;
+  createdAt: string;
+}
+
+export interface Contribution {
+  id: string;
+  roundId: string;
+  membershipId: string;
+  amount: number; // kobo
+  status: ContributionStatus;
+  transactionId: string | null;
+  paidAt: string | null;
+}
+
+export interface Payout {
+  id: string;
+  roundId: string;
+  recipientMembershipId: string;
+  amount: number; // kobo
+  transactionId: string;
+  createdAt: string;
+}

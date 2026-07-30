@@ -7,6 +7,7 @@ import { healthRouter } from './routes/health.routes.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { walletRouter } from './modules/wallet/wallet.routes.js';
 import { chatRouter } from './modules/chat/chat.routes.js';
+import { circleRouter } from './modules/rosca/circle.routes.js';
 import { notFoundHandler, errorHandler } from './middleware/error.js';
 
 /**
@@ -26,6 +27,7 @@ export function createApp(): Express {
   app.use('/auth', authRouter);
   app.use('/wallet', walletRouter);
   app.use('/conversations', chatRouter);
+  app.use('/circles', circleRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -23,6 +23,15 @@ export const FEES = {
   cashOutBps: 150,
   cashOutMinKobo: 5000, // ₦50.00
   cashOutMaxKobo: 500000, // ₦5,000.00
+
+  /**
+   * Cycle fee (coordinator fee): ~1% of a single round's pot, charged once to
+   * the coordinator when a circle starts. Clamped to a floor and cap. We never
+   * touch members' contributions mid-circle.
+   */
+  cycleBps: 100,
+  cycleMinKobo: 10000, // ₦100.00
+  cycleMaxKobo: 1000000, // ₦10,000.00
 } as const;
 
 /** Guardrails for money amounts, in kobo. */
@@ -30,4 +39,11 @@ export const LIMITS = {
   minFundKobo: 10000, // ₦100.00
   minTransferKobo: 10000,
   minCashOutKobo: 50000, // ₦500.00
+} as const;
+
+/** Guardrails for savings circles. */
+export const CIRCLE_LIMITS = {
+  minMembers: 2,
+  maxMembers: 100,
+  minContributionKobo: 50000, // ₦500.00 per round
 } as const;
