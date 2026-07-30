@@ -202,3 +202,30 @@ export interface Payout {
   transactionId: string;
   createdAt: string;
 }
+
+export type DisputeStatus = 'open' | 'resolved' | 'withdrawn';
+
+export interface Dispute {
+  id: string;
+  circleId: string;
+  raisedBy: string;
+  subjectMembershipId: string | null;
+  reason: string;
+  status: DisputeStatus;
+  resolution: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+/** Derived trust signal for a user, computed from their contribution history. */
+export interface Reputation {
+  totalContributions: number;
+  paid: number;
+  missed: number;
+  onTime: number;
+  /** On-time payments as a percentage of all contributions, or null if none yet. */
+  reliabilityPct: number | null;
+  circlesCompleted: number;
+  circlesActive: number;
+  circlesTotal: number;
+}

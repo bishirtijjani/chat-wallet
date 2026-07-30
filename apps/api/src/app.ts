@@ -8,6 +8,7 @@ import { authRouter } from './modules/auth/auth.routes.js';
 import { walletRouter } from './modules/wallet/wallet.routes.js';
 import { chatRouter } from './modules/chat/chat.routes.js';
 import { circleRouter } from './modules/rosca/circle.routes.js';
+import { userRouter } from './modules/user/user.routes.js';
 import { notFoundHandler, errorHandler } from './middleware/error.js';
 
 /**
@@ -28,6 +29,7 @@ export function createApp(): Express {
   app.use('/wallet', walletRouter);
   app.use('/conversations', chatRouter);
   app.use('/circles', circleRouter);
+  app.use('/users', userRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

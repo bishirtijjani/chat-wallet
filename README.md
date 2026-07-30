@@ -9,7 +9,8 @@ and roadmap, and [`docs/DESIGN.md`](docs/DESIGN.md) for the design system.
 ## Status
 
 Milestones **M0 (Foundation)**, **M1 (Wallet & ledger core)**,
-**M2 (Chat core)**, and **M3 (ROSCA engine)** are scaffolded.
+**M2 (Chat core)**, **M3 (ROSCA engine)**, and **M4 (Trust & robustness)**
+are scaffolded.
 
 - **M0** — monorepo, PostgreSQL + migrations, phone + OTP auth, health checks, CI.
 - **M1** — double-entry append-only ledger, user wallets, fund (PSP sandbox),
@@ -21,6 +22,9 @@ Milestones **M0 (Foundation)**, **M1 (Wallet & ledger core)**,
   the cycle fee), then run each round — auto-collect contributions into escrow and
   pay the pot to the round's recipient. Every money event posts into the circle
   chat as a system message.
+- **M4** — the scheduler worker that runs the clock (opens/collects/settles rounds
+  on the circle's frequency), late/missed handling with one-time reminders, derived
+  reputation, a coordinator dashboard, and a dispute log.
 
 ## Repository shape
 
@@ -30,12 +34,18 @@ chat-and-wallet/
 ├─ packages/
 │  └─ shared/            money (kobo) helpers, domain types, zod schemas, fees
 └─ apps/
-   └─ api/               Express + PostgreSQL + Socket.IO
+   └─ api/               Express + PostgreSQL + Socket.IO (server + worker)
       ├─ auth            phone + OTP, JWT + refresh rotation
       ├─ wallet          double-entry ledger, fund/transfer/cash-out
       ├─ chat            conversations, messages, real-time, system messages
-      └─ rosca           savings circles: members, payout order, round engine
+      ├─ rosca           circles, payout order, round engine, scheduler, trust, disputes
+      └─ worker.ts       scheduler process (runs the ROSCA clock on an interval)
 ```
+
+The API server and the scheduler worker share one codebase and database; the
+worker runs as its own process (`npm run worker`). A later milestone can split it
+into `apps/worker` and drive its tick from BullMQ/Redis — the work already lives
+in the idempotent `processDueCircles` engine, so that move is trigger-only.
 
 `apps/worker`, `apps/app` (Expo), and `packages/sdk` arrive in later milestones
 (see the bible's roadmap).
@@ -71,7 +81,7 @@ Balances are **derived** from an append-only, double-entry ledger; nothing
 mutates a balance column. Every movement is one balanced transaction (debits ==
 credits), enforced by a database trigger. See `docs/PROJECT_BIBLE.md` §3.3.
 
-## API (M0 + M1 + M2 + M3)
+## API (M0 + M1 + M2 + M3 + M4)
 
 | Method | Route | Auth | Purpose |
 |---|---|---|---|
@@ -100,9 +110,15 @@ credits), enforced by a database trigger. See `docs/PROJECT_BIBLE.md` §3.3.
 | `POST` | `/circles/:id/start` | Coordinator | Start the cycle (charges cycle fee, opens round 1) |
 | `POST` | `/circles/:id/collect` | Coordinator | Auto-collect due contributions for the open round |
 | `POST` | `/circles/:id/settle` | Coordinator | Pay out the pot and open the next round |
+| `GET`  | `/circles/:id/dashboard` | Member | Who's paid, who's late, pot progress |
+| `GET`  | `/circles/:id/disputes` | Member | List the circle's disputes |
+| `POST` | `/circles/:id/disputes` | Member | Raise a dispute |
+| `POST` | `/circles/:id/disputes/:disputeId/resolve` | Coordinator | Resolve or withdraw a dispute |
+| `GET`  | `/users/me/reputation` | Bearer | Derived trust signal (on-time rate, misses, circles) |
 
-`collect`/`settle` are driven manually in M3; the scheduled worker (roadmap
-M-later) will call them on the circle's `frequency`.
+`collect`/`settle` can be driven manually, but the **scheduler worker**
+(`npm run worker`) calls them automatically on each circle's `frequency`,
+sending reminders and marking missed contributions along the way.
 
 Phone numbers are accepted in any common Nigerian format (`08012345678`,
 `+2348012345678`, …) and normalized to E.164.
@@ -153,6 +169,7 @@ curl -sX POST localhost:4000/wallet/fund \
 | `npm test` | Run unit + integration tests |
 | `npm run migrate` | Apply pending SQL migrations |
 | `npm run dev:api` | Run the API in watch mode |
+| `npm run dev:worker` | Run the scheduler worker in watch mode |
 
 Tests that need a database are skipped automatically when `DATABASE_URL` is
 unset, so `npm test` runs the pure unit tests anywhere.

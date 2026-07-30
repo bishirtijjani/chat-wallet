@@ -250,6 +250,7 @@ export async function startCircle(params: {
       escrowAccountId: circle.escrowAccountId,
       memberCap: circle.memberCap,
       contributionAmount: circle.contributionAmount,
+      frequency: circle.frequency,
       currentRound: 0,
     });
 

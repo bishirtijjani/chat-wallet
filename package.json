@@ -16,6 +16,7 @@
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "dev:api": "npm run dev --workspace apps/api",
+    "dev:worker": "npm run dev:worker --workspace apps/api",
     "migrate": "npm run migrate --workspace apps/api"
   }
 }

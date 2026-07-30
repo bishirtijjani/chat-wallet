@@ -138,9 +138,21 @@ export const setPayoutOrderSchema = z.object({
   order: z.array(z.string().uuid()).min(2),
 });
 
+export const raiseDisputeSchema = z.object({
+  reason: z.string().trim().min(3).max(1000),
+  subjectMembershipId: z.string().uuid().optional(),
+});
+
+export const resolveDisputeSchema = z.object({
+  status: z.enum(['resolved', 'withdrawn']).default('resolved'),
+  resolution: z.string().trim().min(1).max(1000),
+});
+
 export type CreateCircleInput = z.infer<typeof createCircleSchema>;
 export type AddCircleMemberInput = z.infer<typeof addCircleMemberSchema>;
 export type SetPayoutOrderInput = z.infer<typeof setPayoutOrderSchema>;
+export type RaiseDisputeInput = z.infer<typeof raiseDisputeSchema>;
+export type ResolveDisputeInput = z.infer<typeof resolveDisputeSchema>;
 
 export type RequestOtpInput = z.infer<typeof requestOtpSchema>;
 export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;

@@ -2,6 +2,8 @@ import { Router } from 'express';
 import {
   addCircleMemberSchema,
   createCircleSchema,
+  raiseDisputeSchema,
+  resolveDisputeSchema,
   setPayoutOrderSchema,
 } from '@caw/shared';
 import { asyncHandler } from '../../http/async-handler.js';
@@ -11,6 +13,8 @@ import { authenticate, requireUserId, type AuthedRequest } from '../../middlewar
 import { requireUserIdByPhone } from '../user/user.service.js';
 import * as circles from './circle.service.js';
 import { collectDueContributions, settleRound } from './round.engine.js';
+import { getDashboard } from './trust.service.js';
+import * as disputes from './dispute.service.js';
 
 export const circleRouter: Router = Router();
 
@@ -116,5 +120,54 @@ circleRouter.post(
     await circles.assertIsCoordinator(circleId, requireUserId(req));
     const result = await settleRound(circleId);
     res.status(200).json(result);
+  }),
+);
+
+/** GET /circles/:id/dashboard — who's paid, who's late, pot progress (members). */
+circleRouter.get(
+  '/:id/dashboard',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const dashboard = await getDashboard(requireUserId(req), requireParam(req, 'id'));
+    res.status(200).json({ dashboard });
+  }),
+);
+
+/** GET /circles/:id/disputes — list the circle's disputes (members). */
+circleRouter.get(
+  '/:id/disputes',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const list = await disputes.listDisputes(requireUserId(req), requireParam(req, 'id'));
+    res.status(200).json({ disputes: list });
+  }),
+);
+
+/** POST /circles/:id/disputes — raise a dispute (any member). */
+circleRouter.post(
+  '/:id/disputes',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const body = validate(raiseDisputeSchema, req.body);
+    const dispute = await disputes.raiseDispute({
+      userId: requireUserId(req),
+      circleId: requireParam(req, 'id'),
+      reason: body.reason,
+      subjectMembershipId: body.subjectMembershipId,
+    });
+    res.status(201).json({ dispute });
+  }),
+);
+
+/** POST /circles/:id/disputes/:disputeId/resolve — resolve/withdraw (coordinator). */
+circleRouter.post(
+  '/:id/disputes/:disputeId/resolve',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const body = validate(resolveDisputeSchema, req.body);
+    const dispute = await disputes.resolveDispute({
+      userId: requireUserId(req),
+      circleId: requireParam(req, 'id'),
+      disputeId: requireParam(req, 'disputeId'),
+      status: body.status,
+      resolution: body.resolution,
+    });
+    res.status(200).json({ dispute });
   }),
 );

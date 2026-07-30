@@ -1,4 +1,4 @@
-import { formatNaira, kobo } from '@caw/shared';
+import { formatNaira, kobo, type Frequency } from '@caw/shared';
 import type { PoolClient } from '../../db/pool.js';
 import { pool, withTransaction } from '../../db/pool.js';
 import { AppError } from '../../http/errors.js';
@@ -26,8 +26,16 @@ export interface EngineCircle {
   escrowAccountId: string;
   memberCap: number;
   contributionAmount: number;
+  frequency: Frequency;
   currentRound: number;
 }
+
+/** PostgreSQL interval a round's collection window spans, per frequency. */
+export const FREQUENCY_INTERVAL: Record<Frequency, string> = {
+  daily: '1 day',
+  weekly: '7 days',
+  monthly: '1 month',
+};
 
 async function userLabel(db: Pick<PoolClient, 'query'>, userId: string): Promise<string> {
   const { rows } = await db.query(`SELECT display_name, phone FROM users WHERE id = $1`, [userId]);
@@ -64,10 +72,10 @@ export async function openNextRound(client: PoolClient, circle: EngineCircle): P
   }
 
   const round = await client.query(
-    `INSERT INTO rounds (circle_id, round_number, recipient_membership_id, status, opened_at)
-     VALUES ($1, $2, $3, 'collecting', now())
+    `INSERT INTO rounds (circle_id, round_number, recipient_membership_id, status, opened_at, due_at)
+     VALUES ($1, $2, $3, 'collecting', now(), now() + $4::interval)
      RETURNING id`,
-    [circle.id, next, recipientRow.id],
+    [circle.id, next, recipientRow.id, FREQUENCY_INTERVAL[circle.frequency]],
   );
   const roundId = round.rows[0].id as string;
 
@@ -111,11 +119,13 @@ export async function collectDueContributions(
   if (!roundRow) return { collected: 0, pending: 0 };
   const roundId = roundRow.id as string;
 
+  // Collect anything not yet paid, including contributions previously marked
+  // 'missed' — a late member who funds their wallet is collected on the next tick.
   const dues = await pool.query(
     `SELECT c.id, c.amount, c.membership_id, m.user_id
        FROM contributions c
        JOIN circle_members m ON m.id = c.membership_id
-      WHERE c.round_id = $1 AND c.status = 'due'`,
+      WHERE c.round_id = $1 AND c.status IN ('due', 'missed')`,
     [roundId],
   );
 
@@ -253,7 +263,8 @@ export async function loadEngineCircle(
   circleId: string,
 ): Promise<EngineCircle> {
   const { rows } = await db.query(
-    `SELECT id, conversation_id, escrow_account_id, member_cap, contribution_amount, current_round
+    `SELECT id, conversation_id, escrow_account_id, member_cap, contribution_amount,
+            frequency, current_round
        FROM circles WHERE id = $1`,
     [circleId],
   );
@@ -265,6 +276,7 @@ export async function loadEngineCircle(
     escrowAccountId: row.escrow_account_id as string,
     memberCap: Number(row.member_cap),
     contributionAmount: Number(row.contribution_amount),
+    frequency: row.frequency as Frequency,
     currentRound: Number(row.current_round),
   };
 }
