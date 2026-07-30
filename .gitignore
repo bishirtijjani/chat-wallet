@@ -29,6 +29,8 @@ Thumbs.db
 .idea/
 *.swp
 
-# Expo (future apps/app)
+# Expo
 .expo/
 web-build/
+expo-env.d.ts
+apps/app/dist/

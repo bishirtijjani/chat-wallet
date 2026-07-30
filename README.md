@@ -9,8 +9,8 @@ and roadmap, and [`docs/DESIGN.md`](docs/DESIGN.md) for the design system.
 ## Status
 
 Milestones **M0 (Foundation)**, **M1 (Wallet & ledger core)**,
-**M2 (Chat core)**, **M3 (ROSCA engine)**, and **M4 (Trust & robustness)**
-are scaffolded.
+**M2 (Chat core)**, **M3 (ROSCA engine)**, **M4 (Trust & robustness)**, and
+**M5 (Client)** are scaffolded.
 
 - **M0** — monorepo, PostgreSQL + migrations, phone + OTP auth, health checks, CI.
 - **M1** — double-entry append-only ledger, user wallets, fund (PSP sandbox),
@@ -25,6 +25,27 @@ are scaffolded.
 - **M4** — the scheduler worker that runs the clock (opens/collects/settles rounds
   on the circle's frequency), late/missed handling with one-time reminders, derived
   reputation, a coordinator dashboard, and a dispute log.
+- **M5** — one Expo app (React Native + React Native Web) for iOS, Android, and web,
+  built on the soft-neumorphic design system: phone + OTP sign-in, wallet, live chat
+  over Socket.IO, and the full circle flow (create → add members → start → run rounds).
+
+## The app
+
+One Expo codebase renders on iOS, Android, and web, styled with the neumorphic +
+Apple-HIG system in [`docs/DESIGN.md`](docs/DESIGN.md). Screens shown running
+against the live API:
+
+| Wallet (light) | Wallet (dark) | Savings circle |
+|---|---|---|
+| ![Wallet](docs/screenshots/wallet-light.png) | ![Wallet dark](docs/screenshots/wallet-dark.png) | ![Circle](docs/screenshots/circle.png) |
+
+```bash
+# with the API running (see below) and PostgreSQL up
+npm run build                 # build packages/shared first
+cd apps/app
+npx expo start                # then press w (web), i (iOS), or a (Android)
+# point the app at your API with EXPO_PUBLIC_API_URL (defaults to http://localhost:4000)
+```
 
 ## Repository shape
 
@@ -32,7 +53,7 @@ are scaffolded.
 chat-and-wallet/
 ├─ docs/                 project bible + design system
 ├─ packages/
-│  └─ shared/            money (kobo) helpers, domain types, zod schemas, fees
+│  └─ shared/            money (kobo) helpers, domain types, zod schemas, fees, design tokens
 └─ apps/
    └─ api/               Express + PostgreSQL + Socket.IO (server + worker)
       ├─ auth            phone + OTP, JWT + refresh rotation
@@ -40,6 +61,7 @@ chat-and-wallet/
       ├─ chat            conversations, messages, real-time, system messages
       ├─ rosca           circles, payout order, round engine, scheduler, trust, disputes
       └─ worker.ts       scheduler process (runs the ROSCA clock on an interval)
+   └─ app/               Expo app (React Native + Web): auth, wallet, chat, circles
 ```
 
 The API server and the scheduler worker share one codebase and database; the
@@ -47,8 +69,10 @@ worker runs as its own process (`npm run worker`). A later milestone can split i
 into `apps/worker` and drive its tick from BullMQ/Redis — the work already lives
 in the idempotent `processDueCircles` engine, so that move is trigger-only.
 
-`apps/worker`, `apps/app` (Expo), and `packages/sdk` arrive in later milestones
-(see the bible's roadmap).
+The Expo client lives in `apps/app`; the scheduler currently runs as a worker
+process inside `apps/api` (`npm run worker`). Splitting it into a standalone
+`apps/worker` and extracting a typed `packages/sdk` are follow-ups (see the
+bible's roadmap).
 
 ## Getting started
 

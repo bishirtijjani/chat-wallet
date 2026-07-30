@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Chat & Wallet",
+    "slug": "chat-and-wallet",
+    "scheme": "chatwallet",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#E8EDF3"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ng.chatandwallet.app"
+    },
+    "android": {
+      "package": "ng.chatandwallet.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#E8EDF3"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
