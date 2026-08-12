@@ -26,8 +26,20 @@ Milestones **M0 (Foundation)**, **M1 (Wallet & ledger core)**,
   on the circle's frequency), late/missed handling with one-time reminders, derived
   reputation, a coordinator dashboard, and a dispute log.
 - **M5** — one Expo app (React Native + React Native Web) for iOS, Android, and web,
-  built on the soft-neumorphic design system: phone + OTP sign-in, wallet, live chat
-  over Socket.IO, and the full circle flow (create → add members → start → run rounds).
+  built on the soft-neumorphic design system: phone + OTP sign-in with a device PIN
+  for returning sessions, wallet, live chat over Socket.IO, and the full circle flow
+  (create → add members → start → run rounds).
+
+### Sign-in
+
+Phone + OTP creates the account (find-or-create by phone; no separate "sign up").
+Right after that first verification, the device sets a 4–6 digit PIN. From then on,
+reopening the app unlocks the persisted session with that PIN instead of repeating the
+OTP round-trip — the OTP flow only comes back for a brand-new device or a forgotten PIN
+("Not you? Sign in with your phone number" on the unlock screen), at which point the
+device sets a fresh PIN. Wrong PINs are rate-limited (`PIN.maxAttempts`, see
+`packages/shared/src/constants.ts`); hitting the limit revokes the session and falls
+back to OTP.
 
 ## The app
 

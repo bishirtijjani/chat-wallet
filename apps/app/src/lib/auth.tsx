@@ -15,14 +15,41 @@ import { deleteItem, getItem, setItem } from './storage';
 
 const ACCESS_KEY = 'caw.access';
 const REFRESH_KEY = 'caw.refresh';
+const HAS_PIN_KEY = 'caw.hasPin';
 
-type Status = 'loading' | 'authed' | 'guest';
+/**
+ * - loading      — restoring the persisted session; show a splash.
+ * - guest        — no session on this device; phone + OTP flow.
+ * - otp-verified — OTP just succeeded; device has no PIN yet, must set one.
+ * - locked       — a session is persisted and this device has a PIN; needs the
+ *                   PIN (not a full OTP) to unlock it.
+ * - authed       — unlocked; full app access.
+ */
+export type Status = 'loading' | 'guest' | 'otp-verified' | 'locked' | 'authed';
+
+/** Where each non-loading status should route to. Shared by the layouts. */
+export function routeForStatus(status: Status): string {
+  switch (status) {
+    case 'authed':
+      return '/(tabs)/wallet';
+    case 'otp-verified':
+      return '/(auth)/create-pin';
+    case 'locked':
+      return '/(auth)/unlock';
+    default:
+      return '/(auth)/phone';
+  }
+}
 
 interface AuthValue {
   status: Status;
   user: User | null;
-  requestOtp: (phone: string) => Promise<{ resendInSeconds: number }>;
+  requestOtp: (phone: string) => Promise<{ resendInSeconds: number; isNewUser: boolean }>;
   verifyOtp: (phone: string, code: string, displayName?: string) => Promise<void>;
+  createPin: (pin: string) => Promise<void>;
+  unlockWithPin: (pin: string) => Promise<void>;
+  /** Abandon the locked/otp-verified session on this device and start over via OTP. */
+  useDifferentAccount: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -46,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshTokenRef.current = null;
     await deleteItem(ACCESS_KEY);
     await deleteItem(REFRESH_KEY);
+    await deleteItem(HAS_PIN_KEY);
     disconnectSocket();
     setUser(null);
     setStatus('guest');
@@ -68,36 +96,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => setUnauthorizedHandler(null);
   }, [applyTokens, clear]);
 
-  // Restore a persisted session on launch.
+  // Restore a persisted session on launch. A refresh token is the durable
+  // credential; if the device also has a PIN set, stop there and let the PIN
+  // screen do the unlocking instead of silently hitting the network.
   useEffect(() => {
     (async () => {
       const access = await getItem(ACCESS_KEY);
       const refresh = await getItem(REFRESH_KEY);
-      if (!access) {
+      const hasPin = await getItem(HAS_PIN_KEY);
+
+      if (!refresh) {
         setStatus('guest');
         return;
       }
-      setAccessToken(access);
       refreshTokenRef.current = refresh;
+
+      if (hasPin) {
+        setStatus('locked');
+        return;
+      }
+
+      if (access) setAccessToken(access);
       try {
         const me = await api.me();
         setUser(me.user);
-        connectSocket(access);
+        connectSocket(access!);
         setStatus('authed');
       } catch {
-        if (refresh) {
-          try {
-            const { tokens } = await api.refresh(refresh);
-            await applyTokens(tokens);
-            const me = await api.me();
-            setUser(me.user);
-            setStatus('authed');
-            return;
-          } catch {
-            /* fall through to clear */
-          }
+        try {
+          const { tokens } = await api.refresh(refresh);
+          await applyTokens(tokens);
+          const me = await api.me();
+          setUser(me.user);
+          setStatus('authed');
+        } catch {
+          await clear();
         }
-        await clear();
       }
     })();
     // Run once on mount.
@@ -111,16 +145,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { user: u, tokens } = await api.verifyOtp(phone, code, displayName);
       await applyTokens(tokens);
       setUser(u);
+      // A fresh OTP sign-in always lands here, even for a returning user on a
+      // new device — this device has no PIN yet, so it needs to set one.
+      setStatus('otp-verified');
+    },
+    [applyTokens],
+  );
+
+  const createPin = useCallback(async (pin: string) => {
+    await api.setPin(pin);
+    await setItem(HAS_PIN_KEY, '1');
+    setStatus('authed');
+  }, []);
+
+  const unlockWithPin = useCallback(
+    async (pin: string) => {
+      const rt = refreshTokenRef.current;
+      if (!rt) throw new Error('No session to unlock');
+      const { user: u, tokens } = await api.verifyPin(rt, pin);
+      await applyTokens(tokens);
+      setUser(u);
       setStatus('authed');
     },
     [applyTokens],
   );
 
+  const useDifferentAccount = useCallback(() => clear(), [clear]);
   const logout = useCallback(() => clear(), [clear]);
 
   const value = useMemo<AuthValue>(
-    () => ({ status, user, requestOtp, verifyOtp, logout }),
-    [status, user, requestOtp, verifyOtp, logout],
+    () => ({
+      status,
+      user,
+      requestOtp,
+      verifyOtp,
+      createPin,
+      unlockWithPin,
+      useDifferentAccount,
+      logout,
+    }),
+    [status, user, requestOtp, verifyOtp, createPin, unlockWithPin, useDifferentAccount, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

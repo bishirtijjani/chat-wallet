@@ -1,5 +1,11 @@
 import { Router } from 'express';
-import { requestOtpSchema, verifyOtpSchema, refreshTokenSchema } from '@caw/shared';
+import {
+  requestOtpSchema,
+  verifyOtpSchema,
+  refreshTokenSchema,
+  setPinSchema,
+  verifyPinSchema,
+} from '@caw/shared';
 import { asyncHandler } from '../../http/async-handler.js';
 import { validate } from '../../http/validate.js';
 import { authenticate, requireUserId, type AuthedRequest } from '../../middleware/authenticate.js';
@@ -54,5 +60,26 @@ authRouter.get(
   asyncHandler(async (req: AuthedRequest, res) => {
     const user = await authService.getUserById(requireUserId(req));
     res.status(200).json({ user });
+  }),
+);
+
+/** POST /auth/pin/set — set (or replace) this device's unlock PIN. */
+authRouter.post(
+  '/pin/set',
+  authenticate,
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const body = validate(setPinSchema, req.body);
+    await authService.setPin(requireUserId(req), body.pin);
+    res.status(204).end();
+  }),
+);
+
+/** POST /auth/pin/verify — unlock a persisted session with a PIN instead of an OTP. */
+authRouter.post(
+  '/pin/verify',
+  asyncHandler(async (req, res) => {
+    const body = validate(verifyPinSchema, req.body);
+    const result = await authService.verifyPin(body.refreshToken, body.pin);
+    res.status(200).json(result);
   }),
 );

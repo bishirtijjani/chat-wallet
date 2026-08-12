@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CIRCLE_LIMITS, LIMITS } from './constants.js';
+import { CIRCLE_LIMITS, LIMITS, PIN } from './constants.js';
 import { normalizeNigerianPhone } from './phone.js';
 
 /**
@@ -47,6 +47,23 @@ export const verifyOtpSchema = z.object({
 
 export const refreshTokenSchema = z.object({
   refreshToken: z.string().min(10),
+});
+
+const pinSchema = z
+  .string()
+  .trim()
+  .regex(
+    new RegExp(`^\\d{${PIN.minLength},${PIN.maxLength}}$`),
+    `PIN must be ${PIN.minLength} to ${PIN.maxLength} digits`,
+  );
+
+export const setPinSchema = z.object({
+  pin: pinSchema,
+});
+
+export const verifyPinSchema = z.object({
+  refreshToken: z.string().min(10),
+  pin: pinSchema,
 });
 
 export const fundWalletSchema = z.object({
@@ -157,6 +174,8 @@ export type ResolveDisputeInput = z.infer<typeof resolveDisputeSchema>;
 export type RequestOtpInput = z.infer<typeof requestOtpSchema>;
 export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
 export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;
+export type SetPinInput = z.infer<typeof setPinSchema>;
+export type VerifyPinInput = z.infer<typeof verifyPinSchema>;
 export type FundWalletInput = z.infer<typeof fundWalletSchema>;
 export type TransferInput = z.infer<typeof transferSchema>;
 export type CashOutInput = z.infer<typeof cashOutSchema>;

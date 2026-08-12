@@ -46,16 +46,19 @@ export async function issueRefreshToken(client: PoolClient, userId: string): Pro
   return raw;
 }
 
-/**
- * Validate a refresh token and rotate it: the presented token is revoked and a
- * fresh one issued (refresh-token rotation). Returns the new raw token and the
- * user id.
- */
-export async function rotateRefreshToken(
+interface RefreshTokenRow {
+  id: string;
+  user_id: string;
+  expires_at: string;
+  revoked_at: string | null;
+}
+
+/** Look up a refresh token, throwing if it's missing, revoked, or expired. */
+async function loadValidRefreshToken(
   client: PoolClient,
   rawToken: string,
-): Promise<{ userId: string; refreshToken: string }> {
-  const { rows } = await client.query(
+): Promise<RefreshTokenRow> {
+  const { rows } = await client.query<RefreshTokenRow>(
     `SELECT id, user_id, expires_at, revoked_at
        FROM refresh_tokens WHERE token_hash = $1 FOR UPDATE`,
     [hashToken(rawToken)],
@@ -66,10 +69,31 @@ export async function rotateRefreshToken(
   if (new Date(row.expires_at).getTime() < Date.now()) {
     throw AppError.unauthorized('Refresh token expired');
   }
+  return row;
+}
 
+/**
+ * Validate a refresh token and rotate it: the presented token is revoked and a
+ * fresh one issued (refresh-token rotation). Returns the new raw token and the
+ * user id.
+ */
+export async function rotateRefreshToken(
+  client: PoolClient,
+  rawToken: string,
+): Promise<{ userId: string; refreshToken: string }> {
+  const row = await loadValidRefreshToken(client, rawToken);
   await client.query(`UPDATE refresh_tokens SET revoked_at = now() WHERE id = $1`, [row.id]);
   const refreshToken = await issueRefreshToken(client, row.user_id);
-  return { userId: row.user_id as string, refreshToken };
+  return { userId: row.user_id, refreshToken };
+}
+
+/** Resolve the user id behind a refresh token without rotating it. */
+export async function getUserIdForRefreshToken(
+  client: PoolClient,
+  rawToken: string,
+): Promise<string> {
+  const row = await loadValidRefreshToken(client, rawToken);
+  return row.user_id;
 }
 
 export async function revokeRefreshToken(client: PoolClient, rawToken: string): Promise<void> {

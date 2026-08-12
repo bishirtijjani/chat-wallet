@@ -17,6 +17,18 @@ export const OTP = {
   resendCooldownSeconds: 60,
 } as const;
 
+/**
+ * Device PIN configuration. After the first phone+OTP sign-in, a device can set
+ * a PIN so reopening the app unlocks the existing session instead of repeating
+ * the OTP round-trip (PROJECT_BIBLE §5: "PIN/biometric for money actions").
+ */
+export const PIN = {
+  minLength: 4,
+  maxLength: 6,
+  maxAttempts: 5,
+  lockoutMinutes: 15,
+} as const;
+
 /** Fee schedule for v1 (see PROJECT_BIBLE §6). */
 export const FEES = {
   /** Cash-out fee: 1.5% of the amount, with a floor and cap in kobo. */

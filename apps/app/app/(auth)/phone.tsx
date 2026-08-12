@@ -21,8 +21,8 @@ export default function PhoneScreen() {
     setError(null);
     setLoading(true);
     try {
-      await requestOtp(phone);
-      router.push({ pathname: '/(auth)/otp', params: { phone } });
+      const { isNewUser } = await requestOtp(phone);
+      router.push({ pathname: '/(auth)/otp', params: { phone, isNewUser: String(isNewUser) } });
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Something went wrong. Try again.');
     } finally {

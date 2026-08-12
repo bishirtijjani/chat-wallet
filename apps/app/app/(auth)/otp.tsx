@@ -11,20 +11,21 @@ import { useTheme } from '@/theme/ThemeProvider';
 
 export default function OtpScreen() {
   const theme = useTheme();
-  const { phone } = useLocalSearchParams<{ phone: string }>();
+  const { phone, isNewUser } = useLocalSearchParams<{ phone: string; isNewUser?: string }>();
   const { verifyOtp, requestOtp } = useAuth();
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resent, setResent] = useState(false);
+  const showNameField = isNewUser === 'true';
 
   const submit = async () => {
     setError(null);
     setLoading(true);
     try {
-      await verifyOtp(phone ?? '', code.trim(), name.trim() || undefined);
-      // On success the auth state flips to 'authed' and the router redirects.
+      await verifyOtp(phone ?? '', code.trim(), showNameField ? name.trim() || undefined : undefined);
+      // On success the auth state moves on (set a PIN, or unlock) and the router redirects.
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not verify. Try again.');
       setLoading(false);
@@ -61,12 +62,9 @@ export default function OtpScreen() {
           maxLength={6}
           autoFocus
         />
-        <Input
-          label="Your name (first time only)"
-          value={name}
-          onChangeText={setName}
-          placeholder="e.g. Amina"
-        />
+        {showNameField ? (
+          <Input label="Your name" value={name} onChangeText={setName} placeholder="e.g. Amina" />
+        ) : null}
         {error ? (
           <AppText variant="footnote" color="danger">
             {error}

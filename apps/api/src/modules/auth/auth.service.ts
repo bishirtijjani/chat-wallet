@@ -1,18 +1,26 @@
 import type { AuthTokens, User } from '@caw/shared';
-import { OTP } from '@caw/shared';
+import { OTP, PIN } from '@caw/shared';
 import { loadConfig } from '../../config.js';
 import { pool, withTransaction } from '../../db/pool.js';
 import { AppError } from '../../http/errors.js';
 import { getOrCreateUserWallet } from '../wallet/ledger.service.js';
-import { generateOtp, hashOtp, safeEqualHex } from './crypto.js';
+import { generateOtp, hashOtp, hashPin, safeEqualHex } from './crypto.js';
 import { getSms } from './sms.js';
-import { issueRefreshToken, rotateRefreshToken, revokeRefreshToken, signAccessToken } from './tokens.js';
+import {
+  getUserIdForRefreshToken,
+  issueRefreshToken,
+  rotateRefreshToken,
+  revokeRefreshToken,
+  signAccessToken,
+} from './tokens.js';
 
 /**
  * Request an OTP for a phone number. Enforces a resend cooldown, stores only the
  * hashed code, and dispatches it via the SMS provider.
  */
-export async function requestOtp(phone: string): Promise<{ resendInSeconds: number }> {
+export async function requestOtp(
+  phone: string,
+): Promise<{ resendInSeconds: number; isNewUser: boolean }> {
   // Cooldown: reject if a code was issued very recently.
   const recent = await pool.query(
     `SELECT created_at FROM otp_codes
@@ -23,6 +31,9 @@ export async function requestOtp(phone: string): Promise<{ resendInSeconds: numb
   if (recent.rows[0]) {
     throw AppError.tooManyRequests('An OTP was just sent. Please wait before requesting another.');
   }
+
+  const existing = await pool.query(`SELECT 1 FROM users WHERE phone = $1`, [phone]);
+  const isNewUser = existing.rowCount === 0;
 
   const config = loadConfig();
   const code =
@@ -38,7 +49,7 @@ export async function requestOtp(phone: string): Promise<{ resendInSeconds: numb
   );
 
   await getSms().sendOtp({ phone, code });
-  return { resendInSeconds: OTP.resendCooldownSeconds };
+  return { resendInSeconds: OTP.resendCooldownSeconds, isNewUser };
 }
 
 /**
@@ -122,6 +133,90 @@ export async function refresh(rawRefreshToken: string): Promise<AuthTokens> {
 
 export async function logout(rawRefreshToken: string): Promise<void> {
   await withTransaction((client) => revokeRefreshToken(client, rawRefreshToken));
+}
+
+/** Set (or replace) the PIN a device uses to unlock an existing session. */
+export async function setPin(userId: string, pin: string): Promise<void> {
+  await pool.query(
+    `UPDATE users
+        SET pin_hash = $2, pin_failed_attempts = 0, pin_locked_until = NULL, updated_at = now()
+      WHERE id = $1`,
+    [userId, hashPin(pin)],
+  );
+}
+
+/**
+ * Unlock a session with a device PIN instead of a fresh OTP. Identifies the
+ * user from the still-valid refresh token, checks the PIN, and — on success —
+ * rotates the refresh token like a normal `/auth/refresh`. Wrong PINs count
+ * against a lockout; hitting it revokes the refresh token so the device falls
+ * back to a full phone+OTP sign-in.
+ *
+ * The failed-attempt bookkeeping runs as its own committed statement, not
+ * inside the transaction we're about to throw out of — `withTransaction`
+ * rolls back on any error, so a mutation made right before a throw and left
+ * in the same transaction would vanish along with it.
+ */
+export async function verifyPin(
+  rawRefreshToken: string,
+  pin: string,
+): Promise<{ user: User; tokens: AuthTokens }> {
+  const userId = await withTransaction((client) =>
+    getUserIdForRefreshToken(client, rawRefreshToken),
+  );
+
+  const { rows } = await pool.query(
+    `SELECT phone, display_name, kyc_tier, created_at, pin_hash, pin_locked_until
+       FROM users WHERE id = $1`,
+    [userId],
+  );
+  const row = rows[0];
+  if (!row) throw AppError.unauthorized();
+
+  if (!row.pin_hash) {
+    throw AppError.badRequest('No PIN set for this account. Sign in with your phone number.');
+  }
+  if (row.pin_locked_until && new Date(row.pin_locked_until).getTime() > Date.now()) {
+    throw AppError.tooManyRequests(
+      'Too many incorrect PIN attempts. Sign in with your phone number.',
+    );
+  }
+
+  if (!safeEqualHex(row.pin_hash, hashPin(pin))) {
+    const { rows: attemptRows } = await pool.query(
+      `UPDATE users
+          SET pin_failed_attempts = pin_failed_attempts + 1,
+              pin_locked_until = CASE
+                WHEN pin_failed_attempts + 1 >= $2
+                  THEN now() + ($3 || ' minutes')::interval
+                ELSE pin_locked_until
+              END
+        WHERE id = $1
+        RETURNING pin_failed_attempts, pin_locked_until`,
+      [userId, PIN.maxAttempts, PIN.lockoutMinutes],
+    );
+    const lockedOut = Number(attemptRows[0].pin_failed_attempts) >= PIN.maxAttempts;
+    if (lockedOut) {
+      await withTransaction((client) => revokeRefreshToken(client, rawRefreshToken));
+      throw AppError.tooManyRequests(
+        'Too many incorrect PIN attempts. Sign in with your phone number.',
+      );
+    }
+    throw AppError.unauthorized('Incorrect PIN');
+  }
+
+  return withTransaction(async (client) => {
+    await client.query(
+      `UPDATE users SET pin_failed_attempts = 0, pin_locked_until = NULL WHERE id = $1`,
+      [userId],
+    );
+    const { refreshToken } = await rotateRefreshToken(client, rawRefreshToken);
+    const access = signAccessToken(userId);
+    return {
+      user: mapUser(row),
+      tokens: { accessToken: access.token, refreshToken, expiresIn: access.expiresIn },
+    };
+  });
 }
 
 export async function getUserById(userId: string): Promise<User> {

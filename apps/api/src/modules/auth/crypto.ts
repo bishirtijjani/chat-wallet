@@ -13,6 +13,12 @@ export function hashOtp(code: string): string {
   return createHmac('sha256', OTP_PEPPER).update(code).digest('hex');
 }
 
+/** HMAC-SHA256 a device PIN, domain-separated from OTP hashing (same pepper). */
+export function hashPin(pin: string): string {
+  const { OTP_PEPPER } = loadConfig();
+  return createHmac('sha256', OTP_PEPPER).update(`pin:${pin}`).digest('hex');
+}
+
 /** Constant-time comparison of two hex digests. */
 export function safeEqualHex(a: string, b: string): boolean {
   const ab = Buffer.from(a, 'hex');

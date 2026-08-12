@@ -70,7 +70,10 @@ const post = (path: string, body?: unknown) =>
 export const api = {
   // Auth
   requestOtp: (phone: string) =>
-    post('/auth/otp/request', { phone }) as Promise<{ resendInSeconds: number }>,
+    post('/auth/otp/request', { phone }) as Promise<{
+      resendInSeconds: number;
+      isNewUser: boolean;
+    }>,
   verifyOtp: (phone: string, code: string, displayName?: string) =>
     post('/auth/otp/verify', { phone, code, displayName }) as Promise<{
       user: User;
@@ -79,6 +82,12 @@ export const api = {
   refresh: (refreshToken: string) =>
     post('/auth/refresh', { refreshToken }) as Promise<{ tokens: AuthTokens }>,
   me: () => request<{ user: User }>('/auth/me'),
+  setPin: (pin: string) => post('/auth/pin/set', { pin }) as Promise<void>,
+  verifyPin: (refreshToken: string, pin: string) =>
+    post('/auth/pin/verify', { refreshToken, pin }) as Promise<{
+      user: User;
+      tokens: AuthTokens;
+    }>,
 
   // Wallet
   wallet: () => request<{ wallet: Wallet }>('/wallet'),

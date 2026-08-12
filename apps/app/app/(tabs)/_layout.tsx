@@ -1,6 +1,6 @@
 import { Redirect, Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '@/lib/auth';
+import { routeForStatus, useAuth } from '@/lib/auth';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Splash } from '@/components/Splash';
 
@@ -9,7 +9,7 @@ export default function TabsLayout() {
   const theme = useTheme();
 
   if (status === 'loading') return <Splash />;
-  if (status !== 'authed') return <Redirect href="/(auth)/phone" />;
+  if (status !== 'authed') return <Redirect href={routeForStatus(status)} />;
 
   return (
     <Tabs
