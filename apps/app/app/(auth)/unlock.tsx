@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { PIN } from '@caw/shared';
 import { useAuth } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
@@ -11,6 +12,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 
 export default function UnlockScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const { unlockWithPin, useDifferentAccount } = useAuth();
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
@@ -62,7 +64,15 @@ export default function UnlockScreen() {
           loading={loading}
           disabled={pin.length < PIN.minLength}
         />
-        <Pressable onPress={() => useDifferentAccount()} style={{ alignSelf: 'center' }}>
+        <Pressable
+          onPress={async () => {
+            await useDifferentAccount();
+            // The layout only auto-redirects out of this group on 'authed';
+            // from guest we still need to navigate to the phone screen.
+            router.replace('/(auth)/phone');
+          }}
+          style={{ alignSelf: 'center' }}
+        >
           <AppText variant="subhead" color="accent">
             Not you? Sign in with your phone number
           </AppText>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
 import { Screen } from '@/components/Screen';
@@ -11,6 +11,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 
 export default function OtpScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const { phone, isNewUser } = useLocalSearchParams<{ phone: string; isNewUser?: string }>();
   const { verifyOtp, requestOtp } = useAuth();
   const [code, setCode] = useState('');
@@ -25,7 +26,9 @@ export default function OtpScreen() {
     setLoading(true);
     try {
       await verifyOtp(phone ?? '', code.trim(), showNameField ? name.trim() || undefined : undefined);
-      // On success the auth state moves on (set a PIN, or unlock) and the router redirects.
+      // The layout only auto-redirects out of this group on 'authed'; from
+      // otp-verified we still need to navigate to the create-pin screen.
+      router.replace('/(auth)/create-pin');
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not verify. Try again.');
       setLoading(false);

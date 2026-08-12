@@ -64,8 +64,8 @@ async function request<T>(path: string, init?: RequestInit, retry = true): Promi
   return data as T;
 }
 
-const post = (path: string, body?: unknown) =>
-  request(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined });
+const post = (path: string, body?: unknown, retry = true) =>
+  request(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }, retry);
 
 export const api = {
   // Auth
@@ -79,12 +79,17 @@ export const api = {
       user: User;
       tokens: AuthTokens;
     }>,
+  // No Bearer token is involved in either of these — a 401 means the
+  // *refresh* token was rejected (expired/revoked) or the PIN was wrong, not
+  // that the access token needs refreshing. Letting the generic 401-retry
+  // fire here would call /auth/refresh as a side effect of a wrong PIN,
+  // rotating the token out from under the retried request.
   refresh: (refreshToken: string) =>
-    post('/auth/refresh', { refreshToken }) as Promise<{ tokens: AuthTokens }>,
+    post('/auth/refresh', { refreshToken }, false) as Promise<{ tokens: AuthTokens }>,
   me: () => request<{ user: User }>('/auth/me'),
   setPin: (pin: string) => post('/auth/pin/set', { pin }) as Promise<void>,
   verifyPin: (refreshToken: string, pin: string) =>
-    post('/auth/pin/verify', { refreshToken, pin }) as Promise<{
+    post('/auth/pin/verify', { refreshToken, pin }, false) as Promise<{
       user: User;
       tokens: AuthTokens;
     }>,
